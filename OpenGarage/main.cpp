@@ -231,7 +231,7 @@ void on_sta_change_controller() {
       // if alarm is not enabled, trigger relay right away
 		  uint ms = 1000;
 	    if (server->hasArg("delay")) {
-		    ms = server->arg("delay");
+        ms = atoi(server->arg("delay"));
 	    }
       og.click_relay(ms);
     } else {
@@ -616,7 +616,7 @@ void process_alarm() {
       og.play_note(0);
       uint ms = 1000;
       if (server->hasArg("delay")) {
-        ms = server->arg("delay");
+        ms = atoi(server->arg("delay"));
       }
       og.click_relay(ms);
     }
