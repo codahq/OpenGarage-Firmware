@@ -229,7 +229,11 @@ void on_sta_change_controller() {
     server_send_result(HTML_SUCCESS);
     if(!og.options[OPTION_ALM].ival) {
       // if alarm is not enabled, trigger relay right away
-      og.click_relay();
+		  uint ms = 1000;
+	    if (server->hasArg("delay")) {
+		    ms = server->arg("delay");
+	    }
+      og.click_relay(ms);
     } else {
       // else, set alarm
       og.set_alarm();
@@ -610,7 +614,11 @@ void process_alarm() {
     og.alarm--;
     if(og.alarm==0) {
       og.play_note(0);
-      og.click_relay();
+      uint ms = 1000;
+      if (server->hasArg("delay")) {
+        ms = server->arg("delay");
+      }
+      og.click_relay(ms);
     }
   }
 }
