@@ -22,10 +22,11 @@
 
 #include "OpenGarage.h"
 
-ulong OpenGarage::echo_time;
 byte  OpenGarage::state = OG_STATE_INITIAL;
 File  OpenGarage::log_file;
 byte  OpenGarage::alarm = 0;
+byte  OpenGarage::led_reverse = 0;
+Ticker ud_ticker;
 
 static const char* config_fname = CONFIG_FNAME;
 static const char* log_fname = LOG_FNAME;
@@ -36,19 +37,75 @@ static const char* log_fname = LOG_FNAME;
  */
 OptionStruct OpenGarage::options[] = {
   {"fwv", OG_FWV,      255, ""},
-  {"acc", OG_ACC_LOCAL,  2, ""},
-  {"mnt", OG_MNT_CEILING,1, ""},
+  {"mnt", OG_MNT_CEILING,3, ""},
   {"dth", 50,        65535, ""},
-  {"riv", 4,           300, ""},
+  {"vth", 150,       65535, ""},
+  {"riv", 5,           300, ""},
   {"alm", OG_ALM_5,      2, ""},
+  {"lsz", DEFAULT_LOG_SIZE,400,""},
   {"htp", 80,        65535, ""},
+  {"cdt", 1000,       5000, ""},
   {"mod", OG_MOD_AP,   255, ""},
+  {"ati", 30,          720, ""},
+  {"ato", OG_AUTO_NONE,255, ""},
+  {"atib", 3,          24, ""},
+  {"atob", OG_AUTO_NONE,255, ""},
+  {"noto", OG_NOTIFY_DO|OG_NOTIFY_DC,255, ""},
+  {"usi", 0,             1, ""},
   {"ssid", 0, 0, ""},  // string options have 0 max value
   {"pass", 0, 0, ""},
   {"auth", 0, 0, ""},
+  {"bdmn", 0,            0, "blynk-cloud.com"},
+  {"bprt", 80,       65535, ""},
   {"dkey", 0, 0, DEFAULT_DKEY},
-  {"name", 0, 0, DEFAULT_NAME}
+  {"name", 0, 0, DEFAULT_NAME},
+  {"iftt", 0, 0, ""},
+  {"mqtt", 0, 0, "-.-.-.-"},
+  {"dvip", 0, 0, "-.-.-.-"},
+  {"gwip", 0, 0, "-.-.-.-"},
+  {"subn", 0, 0, "255.255.255.0"}
 };
+
+/* Variables and functions for handling Ultrasonic Distance sensor */
+#define KAVG 7  // k average
+volatile uint32_t ud_start = 0;
+volatile byte ud_i = 0;
+volatile boolean fullbuffer = false;
+volatile uint32_t ud_buffer[KAVG];
+volatile boolean triggered = false;
+
+// start trigger signal
+void ud_start_trigger() {
+  digitalWrite(PIN_TRIG, LOW);
+  delayMicroseconds(2);
+  digitalWrite(PIN_TRIG, HIGH);
+  delayMicroseconds(20);
+  digitalWrite(PIN_TRIG, LOW);
+  triggered = true;
+}
+
+ICACHE_RAM_ATTR void ud_isr() {
+  if(!triggered) return;
+
+  // ECHO pin went from low to high
+  if(digitalRead(PIN_ECHO)==HIGH) {
+    ud_start = micros();  // record start time
+  } else {
+    // ECHO pin went from high to low
+    triggered = false;
+    ud_buffer[ud_i] = micros() - ud_start; // calculate elapsed time
+    if(ud_buffer[ud_i]>26233L) ud_buffer[ud_i] = 26233L;  // clamp time value
+    ud_i = (ud_i+1)%KAVG; // circular buffer
+    if(ud_i==0) fullbuffer=true;
+    /*if(ud_i) {  // we want to read KAVG times consecutively
+      ud_start_trigger();
+    }*/
+  }
+}
+
+void ud_ticker_cb() {
+  ud_start_trigger();
+}
     
 void OpenGarage::begin() {
   digitalWrite(PIN_RESET, HIGH);
@@ -60,22 +117,42 @@ void OpenGarage::begin() {
   digitalWrite(PIN_RELAY, LOW);
   pinMode(PIN_RELAY, OUTPUT);
 
-  digitalWrite(PIN_LED, LOW);
+  // detect LED logic
+  pinMode(PIN_LED, INPUT);
+  // use median filtering to detect led logic
+  byte nl=0, nh=0;
+  for(byte i=0;i<KAVG;i++) {
+    if(digitalRead(PIN_LED)==HIGH) nh++;
+    else nl++;
+    delay(50);
+  }
+  if(nh>nl) { // if we get more HIGH readings
+    led_reverse = 1;  // if no external LED connected, reverse logic
+    //Serial.println(F("reverse logic"));
+  } else {
+    //Serial.println(F("normal logic"));
+  }
+
   pinMode(PIN_LED, OUTPUT);
+  set_led(LOW);
   
   digitalWrite(PIN_TRIG, HIGH);
   pinMode(PIN_TRIG, OUTPUT);
   
   pinMode(PIN_ECHO, INPUT);
   pinMode(PIN_BUTTON, INPUT_PULLUP);
+
+  pinMode(PIN_SWITCH, INPUT_PULLUP);
   
   state = OG_STATE_INITIAL;
   
   if(!SPIFFS.begin()) {
     DEBUG_PRINTLN(F("failed to mount file system!"));
   }
-  
-  play_startup_tune();
+
+  // setup ticker
+  ud_ticker.attach_ms(250, ud_ticker_cb);
+  attachInterrupt(PIN_ECHO, ud_isr, CHANGE);
 }
 
 void OpenGarage::options_setup() {
@@ -101,7 +178,7 @@ void OpenGarage::options_reset() {
   if(!SPIFFS.remove(config_fname)) {
     DEBUG_PRINTLN(F("failed to remove config file"));
     return;
-  }
+  }else{DEBUG_PRINTLN(F("Removed config file"));}
   DEBUG_PRINTLN(F("ok"));
 }
 
@@ -109,7 +186,7 @@ void OpenGarage::log_reset() {
   if(!SPIFFS.remove(log_fname)) {
     DEBUG_PRINTLN(F("failed to remove log file"));
     return;
-  }
+  }else{DEBUG_PRINTLN(F("Removed log file"));}
   DEBUG_PRINTLN(F("ok"));  
 }
 
@@ -129,10 +206,16 @@ void OpenGarage::options_load() {
     DEBUG_PRINTLN(F("failed"));
     return;
   }
+  byte nopts = 0;
   while(file.available()) {
     String name = file.readStringUntil(':');
     String sval = file.readStringUntil('\n');
     sval.trim();
+    DEBUG_PRINT(name);
+    DEBUG_PRINT(":");
+    DEBUG_PRINTLN(sval);
+    nopts++;
+    if(nopts>NUM_OPTIONS+1) break;
     int idx = find_option(name);
     if(idx<0) continue;
     if(options[idx].max) {  // this is an integer option
@@ -164,48 +247,35 @@ void OpenGarage::options_save() {
   file.close();
 }
 
-ulong OpenGarage::read_distance_once() {
-  digitalWrite(PIN_TRIG, LOW);
-  delayMicroseconds(2);
-  digitalWrite(PIN_TRIG, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(PIN_TRIG, LOW);
-  // wait till echo pin's rising edge
-  while(digitalRead(PIN_ECHO)==LOW);
-  unsigned long start_time = micros();
-  // wait till echo pin's falling edge
-  while(digitalRead(PIN_ECHO)==HIGH);
-  return micros() - start_time;  
-}
-
 uint OpenGarage::read_distance() {
   byte i;
-  unsigned long _time = 0;
-  // do three readings in a roll to reduce noise
-  byte K = 3;
-  for(i=0;i<K;i++) {
-    _time += read_distance_once();
-    delay(50);
+  //unsigned long _time = 0;
+  uint32_t buf[KAVG];
+  noInterrupts(); // turn off interrupts while we read buffer
+  if(!fullbuffer) return ud_i>0? (uint)(ud_buffer[ud_i-1]*0.01716f) : 0;
+  // copy ud_buffer to local buffer
+  for(i=0;i<KAVG;i++) {
+    buf[i] = ud_buffer[i];
   }
-  _time /= K;
-  echo_time = _time;
-  return (uint)(echo_time*0.01716f);  // 34320 cm / 2 / 10^6 s
+  interrupts();
+  // partial sorting of buf to perform median filtering
+  byte out, in;
+  for(out=1; out<=KAVG/2; out++){ 
+    uint32_t temp = buf[out];
+    in = out;
+    while(in>0 && buf[in-1]>temp) {
+      buf[in] = buf[in-1]; 
+      in--;
+    }
+    buf[in] = temp;   
+  }  
+  return (uint)(buf[KAVG/2]*0.01716f);  // 34320 cm / 2 / 10^6 s
 }
 
 bool OpenGarage::get_cloud_access_en() {
-  if(options[OPTION_ACC].ival == OG_ACC_CLOUD ||
-     options[OPTION_ACC].ival == OG_ACC_BOTH) {
-    if(options[OPTION_AUTH].sval.length()==32) {
-      return true;
-    }
+  if(options[OPTION_AUTH].sval.length()==32) {
+    return true;
   }
-  return false;
-}
-
-bool OpenGarage::get_local_access_en() {
-  if(options[OPTION_ACC].ival == OG_ACC_LOCAL ||
-     options[OPTION_ACC].ival == OG_ACC_BOTH)
-     return true;
   return false;
 }
 
@@ -225,7 +295,7 @@ void OpenGarage::write_log(const LogStruct& data) {
     file.write((const byte*)&data, sizeof(LogStruct));
     LogStruct l;
     l.tstamp = 0;
-    for(;next<MAX_LOG_RECORDS;next++) {
+    for(;next<MAX_LOG_SIZE;next++) {  // pre-fill the log file to maximum size
       file.write((const byte*)&l, sizeof(LogStruct));
     }
   } else {
@@ -235,7 +305,7 @@ void OpenGarage::write_log(const LogStruct& data) {
       return;
     }
     file.readBytes((char*)&curr, sizeof(curr));
-    uint next = (curr+1) % MAX_LOG_RECORDS;
+    uint next = (curr+1) % options[OPTION_LSZ].ival;
     file.seek(0, SeekSet);
     file.write((const byte*)&next, sizeof(next));
 
@@ -252,7 +322,7 @@ bool OpenGarage::read_log_start() {
   if(!log_file) return false;
   uint curr;
   if(log_file.readBytes((char*)&curr, sizeof(curr)) != sizeof(curr)) return false;
-  if(curr>=MAX_LOG_RECORDS) return false;
+  if(curr>=MAX_LOG_SIZE) return false;
   return true;
 }
 
@@ -277,6 +347,16 @@ void OpenGarage::play_note(uint freq) {
   }
 }
 
+void OpenGarage::config_ip() {
+  if(options[OPTION_USI].ival) {
+    IPAddress dvip, gwip, subn;
+    if(dvip.fromString(options[OPTION_DVIP].sval) &&
+       gwip.fromString(options[OPTION_GWIP].sval) &&
+       subn.fromString(options[OPTION_SUBN].sval)) {
+      WiFi.config(dvip, gwip, subn);
+    }
+  }
+}
 #include "pitches.h"
 
 void OpenGarage::play_startup_tune() {

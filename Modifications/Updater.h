@@ -140,8 +140,13 @@ class UpdaterClass {
       }
       return written;
     }
-    
-    void reset() { _reset(); }  // ray: add public reset function
+   /*
+   * ray: add public reset function
+   */ 
+
+		void reset() { 
+			_reset(); 
+		}  
 
   private:
     void _reset();

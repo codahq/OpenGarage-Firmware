@@ -24,16 +24,17 @@
 #define _DEFINES_H
 
 /** Firmware version, hardware version, and maximal values */
-#define OG_FWV    103   // Firmware version: 100 means 1.0.0
+#define OG_FWV    109   // Firmware version: 108 means 1.0.8
 
 /** GPIO pins */
-#define PIN_RELAY  15
+#define PIN_RELAY  15 //D8 on nodemcu
 #define PIN_BUTTON  0
-#define PIN_TRIG   12
-#define PIN_ECHO   14
+#define PIN_TRIG   12 //D6 on nodemcu
+#define PIN_ECHO   14 //D5 on nodemcu
 #define PIN_LED     2
 #define PIN_RESET  16
 #define PIN_BUZZER 13
+#define PIN_SWITCH 4  //D2 on nodemcu
 
 // Default device name
 #define DEFAULT_NAME    "My OpenGarage"
@@ -44,12 +45,10 @@
 // Log file name
 #define LOG_FNAME       "/log.dat"
 
-#define OG_ACC_LOCAL    0x00
-#define OG_ACC_BOTH     0x01
-#define OG_ACC_CLOUD    0x02
-
 #define OG_MNT_CEILING  0x00
 #define OG_MNT_SIDE     0x01
+#define OG_SWITCH_LOW   0x02
+#define OG_SWITCH_HIGH  0x03
 
 #define OG_ALM_NONE     0x00
 #define OG_ALM_5        0x01
@@ -58,20 +57,33 @@
 #define OG_MOD_AP       0xA9
 #define OG_MOD_STA      0x2A
 
+#define OG_AUTO_NONE    0x00
+#define OG_AUTO_NOTIFY  0x01
+#define OG_AUTO_CLOSE   0x02
+
+//Automation Option C - Notify settings
+#define OG_NOTIFY_NONE  0x00
+#define OG_NOTIFY_DO    0x01
+#define OG_NOTIFY_DC    0x02
+#define OG_NOTIFY_VL    0x04
+#define OG_NOTIFY_VA    0x08
+
 #define OG_STATE_INITIAL        0
 #define OG_STATE_CONNECTING     1
 #define OG_STATE_CONNECTED      2
 #define OG_STATE_TRY_CONNECT    3
+#define OG_STATE_WAIT_RESTART   4
 #define OG_STATE_RESET          9
-#define OG_STATE_RESTART        10
 
-#define BLYNK_PIN_LED   V0
+#define BLYNK_PIN_DOOR  V0
 #define BLYNK_PIN_RELAY V1
 #define BLYNK_PIN_LCD   V2
 #define BLYNK_PIN_DIST  V3
-#define BLYNK_PIN_RCNT  V4
+#define BLYNK_PIN_CAR   V4
+#define BLYNK_PIN_IP    V5
 
-#define MAX_LOG_RECORDS    100
+#define DEFAULT_LOG_SIZE    100
+#define MAX_LOG_SIZE       500
 #define ALARM_FREQ         1000
 // door status histogram
 // number of values (maximum is 8)
@@ -84,38 +96,59 @@
 
 typedef enum {
   OPTION_FWV = 0, // firmware version
-  OPTION_ACC,     // accessbility
   OPTION_MNT,     // mount type
-  OPTION_DTH,     // distance threshold
+  OPTION_DTH,     // distance threshold door
+  OPTION_VTH,     // distance threshold vehicle detection
   OPTION_RIV,     // read interval
   OPTION_ALM,     // alarm mode
+  OPTION_LSZ,     // log size
   OPTION_HTP,     // http port
+  OPTION_CDT,     // click delay time
   OPTION_MOD,     // mode
+  OPTION_ATI,     // automation interval (in minutes)
+  OPTION_ATO,     // automation options
+  OPTION_ATIB,    // automation interval B (in hours)
+  OPTION_ATOB,    // automation options B
+  OPTION_NOTO,    // notification options
+  OPTION_USI,     // use static IP
   OPTION_SSID,    // wifi ssid
   OPTION_PASS,    // wifi password
-  OPTION_AUTH,    // authentication token
+  OPTION_AUTH,    // Blynk authentication token
+  OPTION_BDMN,    // Blynk Domain
+  OPTION_BPRT,    // Blynk Port
   OPTION_DKEY,    // device key
   OPTION_NAME,    // device name
+  OPTION_IFTT,    // IFTTT token
+  OPTION_MQTT,    // MQTT IP
+  OPTION_DVIP,    // device IP
+  OPTION_GWIP,    // gateway IP
+  OPTION_SUBN,    // subnet
   NUM_OPTIONS     // number of options
 } OG_OPTION_enum;
 
-#define BUTTON_RESET_TIMEOUT  4000  // if button is pressed for at least 5 seconds, reset
+// if button is pressed for 1 seconds, report IP
+#define BUTTON_REPORTIP_TIMEOUT 800
+// if button is pressed for at least 5 seconds, reset to AP mode
+#define BUTTON_APRESET_TIMEOUT 4500
+// if button is pressed for at least 10 seconds, factory reset
+#define BUTTON_FACRESET_TIMEOUT  9500
+
 #define LED_FAST_BLINK 100
 #define LED_SLOW_BLINK 500
 
-#define TIME_SYNC_TIMEOUT  3600
+#define TIME_SYNC_TIMEOUT  1800 //Issues connecting to MQTT can throw off the time function, sync more often
 
 /** Serial debug functions */
-#define SERIAL_DEBUG
+//#define SERIAL_DEBUG
 #if defined(SERIAL_DEBUG)
 
-  #define DEBUG_BEGIN(x)   { delay(2000); Serial.begin(x); }
+  #define DEBUG_BEGIN(x)   { Serial.begin(x); }
   #define DEBUG_PRINT(x)   Serial.print(x)
   #define DEBUG_PRINTLN(x) Serial.println(x)
 
 #else
 
-  #define DEBUG_BEGIN(x)   {}
+  #define DEBUG_BEGIN(x)   { Serial.begin(x); }
   #define DEBUG_PRINT(x)   {}
   #define DEBUG_PRINTLN(x) {}
 

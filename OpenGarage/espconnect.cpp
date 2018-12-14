@@ -21,34 +21,34 @@
  */
  
 #include "espconnect.h"
-#include "html_ap_home.h"
-#include "html_sta_options.h"
-#include "html_sta_home.h"
-#include "html_sta_update.h"
-#include "html_sta_logs.h"
 
-// R is a C++ literal for raw string
-const char html_mobile_header[] PROGMEM = R"(<head><meta name='viewport' content='width=device-width,initial-scale=1.0,minimum-scale=1.0,user-scalable=no'><title>OpenGarage</title><style>body{font-family:'helvetica';}</style></head>)";
-
-const char html_jquery_header[] PROGMEM = "<head><title>OpenGarage</title><meta name='viewport' content='width=device-width, initial-scale=1'><link rel='stylesheet' href='http://code.jquery.com/mobile/1.3.1/jquery.mobile-1.3.1.min.css' type='text/css'><script src='http://code.jquery.com/jquery-1.9.1.min.js' type='text/javascript'></script><script src='http://code.jquery.com/mobile/1.3.1/jquery.mobile-1.3.1.min.js' type='text/javascript'></script></head>";
-
-const char html_ap_redirect[] PROGMEM = "<h3>WiFi config saved. Now switching to station mode.</h3>";
+//const char html_ap_redirect[] PROGMEM = "<h3>WiFi config saved. Now switching to station mode.</h3>";
 
 String scan_network() {
   DEBUG_PRINTLN(F("scan network"));
   WiFi.mode(WIFI_STA);
   WiFi.disconnect();
   byte n = WiFi.scanNetworks();
+  String wirelessinfo;
   if (n>32) n = 32; // limit to 32 ssids max
-  String ssids = "{\"ssids\":["; 
+   //Maintain old format of wireless network JSON for mobile app compat
+   wirelessinfo = "{\"ssids\":["; 
   for(int i=0;i<n;i++) {
-    ssids += "\"";
-    ssids += WiFi.SSID(i);
-    ssids += "\"";
-    if(i<n-1) ssids += ",\r\n";
+    wirelessinfo += "\"";
+    wirelessinfo += WiFi.SSID(i);
+    wirelessinfo += "\"";
+    if(i<n-1) wirelessinfo += ",\r\n";
   }
-  ssids += "]}";
-  return ssids;
+  wirelessinfo += "],";
+  wirelessinfo += "\"rssis\":["; 
+  for(int i=0;i<n;i++) {
+    wirelessinfo += "\"";
+    wirelessinfo += WiFi.RSSI(i);
+    wirelessinfo += "\"";
+    if(i<n-1) wirelessinfo += ",\r\n";
+  }
+  wirelessinfo += "]}";
+  return wirelessinfo;
 }
 
 void start_network_ap(const char *ssid, const char *pass) {
@@ -62,16 +62,26 @@ void start_network_ap(const char *ssid, const char *pass) {
   WiFi.disconnect();  // disconnect from router
 }
 
-void start_network_sta_with_ap(const char *ssid, const char *pass) {
+void start_network_sta(const char *ssid, const char *pass, bool staonly) {
   if(!ssid || !pass) return;
-  DEBUG_PRINTLN(F("STA mode with AP"));
+  DEBUG_PRINTLN(F("Sarting start_network_sta"));
+  if(staonly){
+    DEBUG_PRINTLN(F("Setting STA mode"));
+    //WiFi.mode(WIFI_OFF); //Fix for bug in 2.3 on connect after SoftAP mode
+    if(WiFi.getMode() != WIFI_STA)  WiFi.mode(WIFI_STA); 
+  }else{ 
+    //WiFi.mode(WIFI_OFF);
+    if(WiFi.getMode() != WIFI_AP_STA) WiFi.mode(WIFI_AP_STA);
+    DEBUG_PRINTLN(F("Setting to AP+STA mode"));
+  }
   WiFi.begin(ssid, pass);
 }
 
+void start_network_sta_with_ap(const char *ssid, const char *pass) {
+  start_network_sta(ssid, pass, false);
+}
+
 void start_network_sta(const char *ssid, const char *pass) {
-  if(!ssid || !pass) return;
-  DEBUG_PRINTLN(F("STA mode"));
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(ssid, pass);
+  start_network_sta(ssid, pass, true);
 }
 

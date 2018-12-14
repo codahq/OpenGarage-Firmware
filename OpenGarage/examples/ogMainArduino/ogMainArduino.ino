@@ -19,16 +19,22 @@
  * along with this program.  If not, see
  * <http://www.gnu.org/licenses/>.
  */
-
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
 #include <ESP8266mDNS.h>
 #include <WiFiUdp.h>
 #include <time.h>
 #include <FS.h>
-#include <BlynkSimpleEsp8266.h>
+
 #include <OpenGarage.h>
 
+struct tcp_pcb;
+extern struct tcp_pcb* tcp_tw_pcbs;
+extern "C" void tcp_abort (struct tcp_pcb* pcb);
+
+void tcpCleanup()   // losing bytes work around
+{  while(tcp_tw_pcbs)
+  {    tcp_abort(tcp_tw_pcbs);  }}
 void do_setup();
 void do_loop();
 
@@ -38,4 +44,5 @@ void setup() {
 
 void loop() {
   do_loop();
+  tcpCleanup();       
 }

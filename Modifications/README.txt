@@ -1,11 +1,7 @@
-This folder contains modifications to files in other libraries. Copy these files to the corresponding folders to overwrite the existing files there.
+Copy this file to the corresponding folder to overwrite the existing file there, or make changes according
+to the description below.
 
-* BlynkSimpleEsp8266.h: (under Blynk library folder)
+* Updater.h: (under esp8266/x.x.x/cores/esp8266 folder which can be found in your local app folder in your profile under windows, %LOCALAPPDATA% can be entered into the run window to open this folder)
 
-Added an additional begin() function that does not require ssid and password. This allows the OpenGarage main loop to manage WiFi connection.
-
-
-* Updater.h: (under esp8266/x.x.x/cores/esp8266 folder)
-
-Added a public reset function to allow OTA update to abort and reset upon error.
+Add a public 'reset()' function that calls the private _reset() function, in order to allow OTA update to abort upon failure in device key authorization and reset upon error.
 
