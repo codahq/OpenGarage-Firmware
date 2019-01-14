@@ -348,6 +348,8 @@ const char sta_options_html[] PROGMEM = R"(<head><title>OpenGarage</title><meta 
 <tr><td><b>Blynk Port:<a href='#BlynkPortInfo' data-rel='popup' data-role='button' data-inline='true' data-transition='pop' data-icon='info' data-theme='c' data-iconpos='notext'>Learn more</a><div data-role='popup' id='BlynkPortInfo' class='ui-content' data-theme='b' style='max-width:320px;'><p>Specify a port for a private Blynk server or use the default Blynk cloud option: 80</p></div></b></td><td><input type='text' size=5 maxlength=5 id='bprt' data-mini='true' value=0></td></tr>
 <tr><td><b>IFTTT Key:<a href='#ifttInfo' data-rel='popup' data-role='button' data-inline='true' data-transition='pop' data-icon='info' data-theme='c' data-iconpos='notext'>Learn more</a><div data-role='popup' id='ifttInfo' class='ui-content' data-theme='b' style='max-width:320px;'><p><a href='https://ifttt.com' target='_blank'>IFTTT</a> provides additional notification options (e.g. SMS, email) besides Blynk.</p></div></b></td><td><input type='text' size=20 maxlength=64 id='iftt' data-mini='true' value='-'></td></tr>
 <tr><td><b>MQTT Server:<a href='#mqttInfo' data-rel='popup' data-role='button' data-inline='true' data-transition='pop' data-icon='info' data-theme='c' data-iconpos='notext'>Learn more</a><div data-role='popup' id='mqttInfo' class='ui-content' data-theme='b' style='max-width:320px;'><p>MQTT provides additional workflow options through tools like NodeRed (e.g. SMS, email).</p></div></b></td><td><input type='text' size=16 maxlength=20 id='mqtt' data-mini='true' value=''></td></tr>
+<tr><td><b>SmartThings Hub IP/Port:<a href='#stInfo' data-rel='popup' data-role='button' data-inline='true' data-transition='pop' data-icon='info' data-theme='c' data-iconpos='notext'>Learn more</a><div data-role='popup' id='stInfo' class='ui-content' data-theme='b' style='max-width:320px;'><p>Visit the <a href='https://www.smartthings.com'>SmartThings</a> website.</p></div></b></td><td><input type='text' size=16 maxlength=20 id='smrt' data-mini='true' value=''></td></tr>
+<tr><td><b>Hubitat Hub IP/Port:<a href='#hubInfo' data-rel='popup' data-role='button' data-inline='true' data-transition='pop' data-icon='info' data-theme='c' data-iconpos='notext'>Learn more</a><div data-role='popup' id='hubInfo' class='ui-content' data-theme='b' style='max-width:320px;'><p>Visit the <a href='https://www.hubitat.com'>Hubitat</a> website.</p></div></b></td><td><input type='text' size=16 maxlength=20 id='hubi' data-mini='true' value=''></td></tr>
 </table>
 <table>
 <tr><td colspan=4><b>Choose Notifications:</b></td></tr>
@@ -449,6 +451,8 @@ comm+='&bdmn='+encodeURIComponent($('#bdmn').val());
 comm+='&bprt='+$('#bprt').val();
 comm+='&iftt='+encodeURIComponent($('#iftt').val());
 comm+='&mqtt='+encodeURIComponent($('#mqtt').val());
+comm+='&smrt='+encodeURIComponent($('#smrt').val());
+comm+='&hubi='+encodeURIComponent($('#hubi').val());
 if($('#cb_key').is(':checked')) {
 if(!$('#nkey').val()) {
 if(!confirm('New device key is empty. Are you sure?')) return;
@@ -496,6 +500,8 @@ $('#bdmn').val(jd.bdmn);
 $('#bprt').val(jd.bprt);
 $('#iftt').val(jd.iftt);
 $('#mqtt').val(jd.mqtt);
+$('#smrt').val(jd.smrt);
+$('#hubi').val(jd.hubi);
 $('#dvip').val(jd.dvip);
 $('#gwip').val(jd.gwip);
 $('#subn').val(jd.subn);

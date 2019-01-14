@@ -24,7 +24,7 @@
 #define _DEFINES_H
 
 /** Firmware version, hardware version, and maximal values */
-#define OG_FWV    109   // Firmware version: 108 means 1.0.8
+#define OG_FWV    110   // Firmware version: 108 means 1.0.8
 
 /** GPIO pins */
 #define PIN_RELAY  15 //D8 on nodemcu
@@ -120,6 +120,8 @@ typedef enum {
   OPTION_NAME,    // device name
   OPTION_IFTT,    // IFTTT token
   OPTION_MQTT,    // MQTT IP
+  OPTION_STHUB,   // SmartThings Hub IP
+  OPTION_HHUB,    // Hubitat Hub IP
   OPTION_DVIP,    // device IP
   OPTION_GWIP,    // gateway IP
   OPTION_SUBN,    // subnet

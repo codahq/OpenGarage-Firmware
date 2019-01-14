@@ -61,6 +61,8 @@ OptionStruct OpenGarage::options[] = {
   {"name", 0, 0, DEFAULT_NAME},
   {"iftt", 0, 0, ""},
   {"mqtt", 0, 0, "-.-.-.-"},
+  {"smrt", 0, 0, "-.-.-.-"},
+  {"hubi", 0, 0, "-.-.-.-"},
   {"dvip", 0, 0, "-.-.-.-"},
   {"gwip", 0, 0, "-.-.-.-"},
   {"subn", 0, 0, "255.255.255.0"}
@@ -232,7 +234,7 @@ void OpenGarage::options_save() {
   File file = SPIFFS.open(config_fname, "w");
   DEBUG_PRINTLN(F("saving config file..."));  
   if(!file) {
-    DEBUG_PRINTLN(F("failed"));
+    DEBUG_PRINTLN(F("save failed"));
     return;
   }
   OptionStruct *o = options;
@@ -243,7 +245,7 @@ void OpenGarage::options_save() {
     else
       file.println(o->sval);
   }
-  DEBUG_PRINTLN(F("ok"));  
+  DEBUG_PRINTLN(F("save ok"));  
   file.close();
 }
 

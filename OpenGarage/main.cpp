@@ -28,6 +28,8 @@
 #include <BlynkSimpleEsp8266.h>
 #include <DNSServer.h>
 #include <PubSubClient.h> //https://github.com/Imroy/pubsubclient
+#include <ArduinoJson.h>
+
 
 #include "pitches.h"
 #include "OpenGarage.h"
@@ -67,6 +69,7 @@ static ulong curr_utc_hour= 0;
 static HTTPClient http;
 
 void do_setup();
+void perform_notify(String s);
 
 void server_send_html(String html) {
   server->sendHeader("Access-Control-Allow-Origin", "*"); // from esp8266 2.4 this has to be sent explicitly
@@ -95,6 +98,23 @@ bool get_value_by_key(const char* key, uint& val) {
   } else {
     return false;
   }
+}
+
+// Helper method to delimit Strings
+String getValue(String data, char separator, int index) {
+	int found = 0;
+	int strIndex[] = { 0, -1 };
+	int maxIndex = data.length() - 1;
+
+	for (int i = 0; i <= maxIndex && found <= index; i++) {
+		if (data.charAt(i) == separator || i == maxIndex) {
+			found++;
+			strIndex[0] = strIndex[1] + 1;
+			strIndex[1] = (i == maxIndex) ? i + 1 : i;
+		}
+	}
+
+	return found > index ? data.substring(strIndex[0], strIndex[1]) : "";
 }
 
 bool get_value_by_key(const char* key, String& val) {
@@ -865,6 +885,38 @@ void perform_notify(String s) {
         mqttclient.publish(og.options[OPTION_NAME].sval + "/OUT/NOTIFY",s); 
     }
   }
+
+  // SmartThings Refresh
+  if (og.options[OPTION_STHUB].sval.length() > 6) {
+	  DEBUG_PRINTLN(" Sending SmartThings refresh to " + og.options[OPTION_STHUB].sval);
+
+	  String host = getValue(og.options[OPTION_STHUB].sval, ':', 0);
+	  String port = getValue(og.options[OPTION_STHUB].sval, ':', 1);
+	  if (port == "") port = "80";
+
+	  http.begin(host, strtol(port.c_str(), NULL, 0), "/");
+	  http.addHeader("Content-Type", "application/json");
+	  http.POST("{\"refresh\":true}");
+	  String payload = http.getString();
+	  http.end();
+	  DEBUG_PRINTLN(" SmartThings response payload: " + payload);
+  }
+
+  // Hubitat Refresh
+  if (og.options[OPTION_HHUB].sval.length() > 6) {
+	  DEBUG_PRINTLN(" Sending Hubitat refresh to " + og.options[OPTION_HHUB].sval);
+
+	  String host = getValue(og.options[OPTION_HHUB].sval, ':', 0);
+	  String port = getValue(og.options[OPTION_HHUB].sval, ':', 1);
+	  if (port == "") port = "80";
+
+	  http.begin(host, strtol(port.c_str(), NULL, 0), "/");
+	  http.addHeader("Content-Type", "application/json");
+	  http.POST("{\"refresh\":true}");
+	  String payload = http.getString();
+	  http.end();
+	  DEBUG_PRINTLN(" Hubitat response payload: " + payload);
+  }
 }
 
 void process_dynamics(byte event) {
@@ -1180,11 +1232,7 @@ void process_alarm() {
     og.alarm--;
     if(og.alarm==0) {
       og.play_note(0);
-      uint ms = 1000;
-      if (server->hasArg("delay")) {
-        ms = atoi(server->arg("delay").c_str());
-      }
-      og.click_relay(ms);
+      og.click_relay();
     }
   }
 }
